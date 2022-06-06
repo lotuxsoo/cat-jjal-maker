@@ -37,6 +37,7 @@
     <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
 
     <script type="text/babel">
+      //localStorage사용
       const jsonLocalStorage = {
         setItem: (key, value) => {
           localStorage.setItem(key, JSON.stringify(value));
@@ -44,6 +45,17 @@
         getItem: (key) => {
           return JSON.parse(localStorage.getItem(key));
         },
+      };
+
+      //fetch API사용
+      const fetchCat = async (text) => {
+        const OPEN_API_DOMAIN = "https://cataas.com";
+        //json url값 받아옴
+        const response = await fetch(
+          `${OPEN_API_DOMAIN}/cat/says/${text}?json=true`
+        );
+        const responseJson = await response.json();
+        return `${OPEN_API_DOMAIN}/${responseJson.url}`;
       };
 
       //제목
@@ -73,7 +85,7 @@
           if (value === "") {
             setErrorMessage("빈 값으로 만들 수 없습니다.");
           }
-          updateMainCat();
+          updateMainCat(value);
         }
 
         return (
@@ -92,11 +104,12 @@
       };
 
       // 젤 위 메인카드
-      const MainCard = ({ img, onHeartClick }) => {
+      const MainCard = ({ img, onHeartClick, alreadyFavorite }) => {
+        const heartIcon = alreadyFavorite ? "❤" : "🤍";
         return (
           <div className="main-card">
             <img src={img} alt="고양이" width="400" />
-            <button onClick={onHeartClick}>🤍</button>
+            <button onClick={onHeartClick}>{heartIcon}</button>
           </div>
         );
       };
@@ -115,6 +128,9 @@
       };
 
       const Favorites = ({ favorites }) => {
+        if (favorites.length === 0) {
+          return <div>사진 위 하트를 눌러 고양이를 저장해보자!</div>;
+        }
         return (
           <ul className="favorites">
             {favorites.map((cat) => (
@@ -132,13 +148,15 @@
         const CAT3 =
           "https://cataas.com/cat/595f280b557291a9750ebf65/says/JavaScript";
 
-        const [counter, setCounter] = React.useState(
-          jsonLocalStorage.getItem("counter")
-        );
+        const [counter, setCounter] = React.useState(() => {
+          return jsonLocalStorage.getItem("counter");
+        });
         const [mainCat, setMainCat] = React.useState(CAT1);
-        const [favorites, setFavorites] = React.useState(
-          jsonLocalStorage.getItem("favorites") || []
-        );
+        const [favorites, setFavorites] = React.useState(() => {
+          return jsonLocalStorage.getItem("favorites") || [];
+        });
+
+        const alreadyFavorite = favorites.includes(mainCat);
 
         //하트 클릭함수
         function handleHeartClick() {
@@ -147,19 +165,39 @@
           jsonLocalStorage.setItem("favorites", nextFavorites);
         }
 
-        //counter 업데이트함수
-        function updateMainCat() {
-          setMainCat(CAT2);
-          const nextCounter = counter + 1;
-          setCounter(nextCounter);
-          jsonLocalStorage.setItem("counter", nextCounter);
+        //inital cat함수
+        async function setInitialCat() {
+          const newCat = await fetchCat("First Cat");
+          setMainCat(newCat);
         }
+
+        React.useEffect(() => {
+          setInitialCat();
+        }, []);
+
+        //counter 업데이트함수
+        async function updateMainCat(value) {
+          const newCat = await fetchCat(value);
+          setMainCat(newCat);
+
+          setCounter((prev) => {
+            const nextCounter = prev + 1;
+            jsonLocalStorage.setItem("counter", nextCounter);
+            return nextCounter;
+          });
+        }
+
+        const counterTitle = counter === null ? "" : counter + "번째 ";
 
         return (
           <div>
-            <Title>{counter}번째 고양이 가라사대</Title>
+            <Title>{counterTitle}고양이 가라사대</Title>
             <Form updateMainCat={updateMainCat} />
-            <MainCard img={mainCat} onHeartClick={handleHeartClick} />
+            <MainCard
+              img={mainCat}
+              onHeartClick={handleHeartClick}
+              alreadyFavorite={alreadyFavorite}
+            />
             <Favorites favorites={favorites} />
           </div>
         );
